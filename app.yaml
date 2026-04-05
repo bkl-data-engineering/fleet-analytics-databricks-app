@@ -1,0 +1,23 @@
+command:
+  - uvicorn
+  - app.main:app
+  - --host
+  - 0.0.0.0
+  - --port
+  - "8000"
+
+env:
+  - name: OPENAI_MODEL
+    value: gpt-4o-mini
+  - name: UC_CATALOG
+    value: vehicle_transactions
+  - name: UC_SCHEMA
+    value: gold
+  - name: DRIVER_TABLE
+    value: driver_performance
+  - name: VEHICLE_TABLE
+    value: vehicle_efficiency
+  - name: FLEET_SUMMARY_TABLE
+    value: daily_fleet_summary
+  - name: ENABLE_LLM_FALLBACK
+    value: "true"

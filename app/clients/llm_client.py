@@ -11,8 +11,13 @@ class LLMClient:
         if not self.enabled or self.client is None:
             return "LLM fallback is disabled."
 
-        response = self.client.responses.create(
-            model=self.model,
-            input=prompt,
-        )
-        return response.output_text
+        try:
+            print("LLM fallback triggered")  # 👈 simple visibility
+
+            response = self.client.responses.create(
+                model=self.model,
+                input=prompt,
+            )
+            return response.output_text or "No response generated."
+        except Exception as e:
+            return f"LLM request failed: {str(e)}"

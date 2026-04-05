@@ -1,6 +1,6 @@
-from app.config import settings
 from app.clients.databricks_client import DatabricksClient
 from app.clients.llm_client import LLMClient
+from app.config import settings
 
 
 def get_databricks_client() -> DatabricksClient:

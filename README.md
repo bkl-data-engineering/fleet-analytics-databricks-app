@@ -25,12 +25,13 @@ app/
   routers/
   services/
   clients/
+```
 
 ## Local Run
 ``` bash
 pip install -r requirements.txt
 uvicorn app.main:app --reload
-
+```
 
 ## Git steps
 ```bash
@@ -39,3 +40,4 @@ cd fleet-analytics-databricks-app
 git init
 mkdir -p app/routers app/services app/clients tests
 touch app/__init__.py app/routers/__init__.py app/services/__init__.py app/clients/__init__.py
+```

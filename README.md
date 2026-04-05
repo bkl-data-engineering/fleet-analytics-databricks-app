@@ -19,12 +19,24 @@ It uses a hybrid pattern:
 
 ```text
 app/
-  main.py
-  config.py
-  dependencies.py
-  routers/
-  services/
-  clients/
+├── __init__.py
+├── main.py
+├── config.py
+├── dependencies.py
+├── routers/
+│   ├── __init__.py
+│   ├── driver.py
+│   ├── vehicle.py
+│   └── fleet_summary.py
+├── services/
+│   ├── __init__.py
+│   ├── driver_analytics_service.py
+│   ├── vehicle_efficiency_service.py
+│   └── fleet_daily_summary_service.py
+└── clients/
+    ├── __init__.py
+    ├── databricks_client.py
+    └── llm_client.py
 ```
 
 ## Local Run

@@ -16,8 +16,8 @@ env:
     value: daily_fleet_summary
 
   - name: DATABRICKS_WAREHOUSE_ID
-    value: dbapp-sql-warehouse
-
+    valueFrom: dbapp-sql-warehouse
+    
   - name: ENABLE_LLM_FALLBACK
     value: "true"
 

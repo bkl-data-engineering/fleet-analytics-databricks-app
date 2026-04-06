@@ -11,23 +11,39 @@ class DriverAnalyticsService:
     def __init__(
         self,
         llm_client,
-        table_name: str,
-        warehouse_id: str,
         context_limit: int = 20,
     ) -> None:
         self.llm_client = llm_client
-        self.table_name = table_name
         self.context_limit = context_limit
 
+        # Build full table name from env
+        catalog = os.getenv("UC_CATALOG")
+        schema = os.getenv("UC_SCHEMA")
+        table = os.getenv("DRIVER_TABLE")
+
+        if not all([catalog, schema, table]):
+            raise ValueError("Missing UC_CATALOG / UC_SCHEMA / DRIVER_TABLE env vars")
+
+        self.table_name = f"{catalog}.{schema}.{table}"
+
+        # Warehouse config
+        self.warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
+        if not self.warehouse_id:
+            raise ValueError("Missing DATABRICKS_WAREHOUSE_ID")
+
         self.w = WorkspaceClient()
-        self.warehouse_id = warehouse_id
 
     def _run_sql(self, sql: str):
         response = self.w.statement_execution.execute_statement(
             warehouse_id=self.warehouse_id,
             statement=sql,
         )
-        return response
+
+        # Basic safety check
+        if not response or not response.result or not response.result.data_array:
+            raise ValueError("No data returned from SQL execution")
+
+        return response.result.data_array
 
     def _direct_analytics_answer(self, user_query: str) -> Optional[str]:
         q = user_query.lower().strip()
@@ -39,8 +55,7 @@ class DriverAnalyticsService:
                 ORDER BY avg_mpg DESC
                 LIMIT 1
             """
-            result = self._run_sql(sql)
-            row = result.result.data_array[0]
+            row = self._run_sql(sql)[0]
             return f"Driver {row[0]} has the highest average MPG at {row[1]:.2f}."
 
         if "lowest avg mpg" in q:
@@ -50,8 +65,7 @@ class DriverAnalyticsService:
                 ORDER BY avg_mpg ASC
                 LIMIT 1
             """
-            result = self._run_sql(sql)
-            row = result.result.data_array[0]
+            row = self._run_sql(sql)[0]
             return f"Driver {row[0]} has the lowest average MPG at {row[1]:.2f}."
 
         if "average mpg" in q:
@@ -59,8 +73,7 @@ class DriverAnalyticsService:
                 SELECT AVG(avg_mpg)
                 FROM {self.table_name}
             """
-            result = self._run_sql(sql)
-            val = result.result.data_array[0][0]
+            val = self._run_sql(sql)[0][0]
             return f"The average MPG across all drivers is {val:.2f}."
 
         match = re.search(r"(?:driver|driver id)\s+(\S+)", q)
@@ -73,8 +86,7 @@ class DriverAnalyticsService:
                 WHERE driver_id = '{driver_id}'
                 LIMIT 1
             """
-            result = self._run_sql(sql)
-            row = result.result.data_array[0]
+            row = self._run_sql(sql)[0]
 
             return (
                 f"Driver {row[0]} stats: "
@@ -91,8 +103,8 @@ class DriverAnalyticsService:
             FROM {self.table_name}
             LIMIT {self.context_limit}
         """
-        result = self._run_sql(sql)
-        return str(result.result.data_array)
+        data = self._run_sql(sql)
+        return str(data)
 
     def _llm_analytics_answer(self, user_query: str) -> str:
         context = self.get_context_data()

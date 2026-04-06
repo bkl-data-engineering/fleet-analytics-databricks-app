@@ -47,7 +47,7 @@ class DriverAnalyticsService:
 
     def _direct_analytics_answer(self, user_query: str) -> Optional[str]:
         q = user_query.lower().strip()
-
+        print(f"[DEBUG] - q: {q}")
         if "highest avg mpg" in q or "best avg mpg" in q:
             sql = f"""
                 SELECT driver_id, avg_mpg
@@ -55,6 +55,7 @@ class DriverAnalyticsService:
                 ORDER BY avg_mpg DESC
                 LIMIT 1
             """
+            print(f"[DEBUG] - sql: {sql}")
             row = self._run_sql(sql)[0]
             return f"Driver {row[0]} has the highest average MPG at {row[1]:.2f}."
 

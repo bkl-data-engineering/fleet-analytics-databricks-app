@@ -34,20 +34,39 @@ class DriverAnalyticsService:
         self.w = WorkspaceClient()
 
     def _run_sql(self, sql: str):
+        print(f"[DEBUG] - sql: {sql}")
+    
         response = self.w.statement_execution.execute_statement(
             warehouse_id=self.warehouse_id,
             statement=sql,
+            wait_timeout="30s",
         )
-
-        # Basic safety check
-        if not response or not response.result or not response.result.data_array:
-            raise ValueError("No data returned from SQL execution")
-
-        return response.result.data_array
+    
+        print(f"[DEBUG] - statement status: {getattr(response.status, 'state', None)}")
+        print(f"[DEBUG] - statement id: {getattr(response, 'statement_id', None)}")
+    
+        # Success path: inline rows are present
+        if (
+            response
+            and getattr(response, "result", None)
+            and getattr(response.result, "data_array", None)
+        ):
+            return response.result.data_array
+    
+        # If Databricks returned success but no inline rows, fail with richer debug
+        status = getattr(response.status, "state", None) if getattr(response, "status", None) else None
+        error_msg = None
+        if getattr(response, "status", None) and getattr(response.status, "error", None):
+            error_msg = response.status.error
+    
+        raise ValueError(
+            f"No inline data returned from SQL execution. "
+            f"status={status}, statement_id={getattr(response, 'statement_id', None)}, "
+            f"error={error_msg}"
+        )
 
     def _direct_analytics_answer(self, user_query: str) -> Optional[str]:
         q = user_query.lower().strip()
-        print(f"[DEBUG] - q: {q}")
         if "highest avg mpg" in q or "best avg mpg" in q:
             sql = f"""
                 SELECT driver_id, avg_mpg
@@ -55,7 +74,6 @@ class DriverAnalyticsService:
                 ORDER BY avg_mpg DESC
                 LIMIT 1
             """
-            print(f"[DEBUG] - sql: {sql}")
             row = self._run_sql(sql)[0]
             return f"Driver {row[0]} has the highest average MPG at {row[1]:.2f}."
 

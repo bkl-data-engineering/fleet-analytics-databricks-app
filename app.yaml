@@ -7,13 +7,19 @@ env:
     value: vehicle_transactions
   - name: UC_SCHEMA
     value: gold
+
   - name: DRIVER_TABLE
     value: driver_performance
   - name: VEHICLE_TABLE
     value: vehicle_efficiency
   - name: FLEET_SUMMARY_TABLE
     value: daily_fleet_summary
+
+  - name: DATABRICKS_WAREHOUSE_ID
+    value: dbapp-sql-warehouse
+
   - name: ENABLE_LLM_FALLBACK
     value: "true"
+
   - name: OPENAI_API_KEY
     valueFrom: openai_api_key

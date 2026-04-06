@@ -2,9 +2,9 @@ command:
   - uvicorn
   - app.main:app
   - --host
-  - 0.0.0.0
+  - ${UVICORN_HOST}
   - --port
-  - "8000"
+  - ${UVICORN_PORT}
 
 env:
   - name: UC_CATALOG
@@ -19,3 +19,5 @@ env:
     value: daily_fleet_summary
   - name: ENABLE_LLM_FALLBACK
     value: "true"
+  - name: OPENAI_API_KEY
+    valueFrom: openai_api_key

@@ -3,7 +3,7 @@ from app.clients.llm_client import LLMClient
 from app.config import settings
 
 
- def get_databricks_client() -> DatabricksClient:
+def get_databricks_client() -> DatabricksClient:
     return DatabricksClient(settings)
 
 

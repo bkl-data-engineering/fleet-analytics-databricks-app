@@ -16,7 +16,6 @@ class DriverAnalyticsService:
         self.llm_client = llm_client
         self.context_limit = context_limit
 
-        # Build full table name from env
         catalog = os.getenv("UC_CATALOG")
         schema = os.getenv("UC_SCHEMA")
         table = os.getenv("DRIVER_TABLE")
@@ -26,47 +25,47 @@ class DriverAnalyticsService:
 
         self.table_name = f"{catalog}.{schema}.{table}"
 
-        # Warehouse config
         self.warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
         if not self.warehouse_id:
             raise ValueError("Missing DATABRICKS_WAREHOUSE_ID")
 
         self.w = WorkspaceClient()
 
+    def _to_float(self, value) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
     def _run_sql(self, sql: str):
         print(f"[DEBUG] - sql: {sql}")
-    
+
         response = self.w.statement_execution.execute_statement(
             warehouse_id=self.warehouse_id,
             statement=sql,
             wait_timeout="30s",
         )
-    
-        print(f"[DEBUG] - statement status: {getattr(response.status, 'state', None)}")
+
+        status = getattr(response.status, "state", None) if getattr(response, "status", None) else None
+        print(f"[DEBUG] - statement status: {status}")
         print(f"[DEBUG] - statement id: {getattr(response, 'statement_id', None)}")
-    
-        # Success path: inline rows are present
+
         if (
             response
             and getattr(response, "result", None)
             and getattr(response.result, "data_array", None)
         ):
             return response.result.data_array
-    
-        # If Databricks returned success but no inline rows, fail with richer debug
-        status = getattr(response.status, "state", None) if getattr(response, "status", None) else None
-        error_msg = None
-        if getattr(response, "status", None) and getattr(response.status, "error", None):
-            error_msg = response.status.error
-    
+
         raise ValueError(
-            f"No inline data returned from SQL execution. "
-            f"status={status}, statement_id={getattr(response, 'statement_id', None)}, "
-            f"error={error_msg}"
+            f"No data returned from SQL execution. "
+            f"status={status}, statement_id={getattr(response, 'statement_id', None)}"
         )
 
     def _direct_analytics_answer(self, user_query: str) -> Optional[str]:
         q = user_query.lower().strip()
+        print(f"[DEBUG] - q: {q}")
+
         if "highest avg mpg" in q or "best avg mpg" in q:
             sql = f"""
                 SELECT driver_id, avg_mpg
@@ -75,9 +74,12 @@ class DriverAnalyticsService:
                 LIMIT 1
             """
             row = self._run_sql(sql)[0]
-            return f"Driver {row[0]} has the highest average MPG at {row[1]:.2f}."
+            return (
+                f"Driver {row[0]} has the highest average MPG at "
+                f"{self._to_float(row[1]):.2f}."
+            )
 
-        if "lowest avg mpg" in q:
+        if "lowest avg mpg" in q or "worst avg mpg" in q:
             sql = f"""
                 SELECT driver_id, avg_mpg
                 FROM {self.table_name}
@@ -85,7 +87,62 @@ class DriverAnalyticsService:
                 LIMIT 1
             """
             row = self._run_sql(sql)[0]
-            return f"Driver {row[0]} has the lowest average MPG at {row[1]:.2f}."
+            return (
+                f"Driver {row[0]} has the lowest average MPG at "
+                f"{self._to_float(row[1]):.2f}."
+            )
+
+        if "highest fuel cost" in q or "most fuel cost" in q:
+            sql = f"""
+                SELECT driver_id, total_fuel_cost
+                FROM {self.table_name}
+                ORDER BY total_fuel_cost DESC
+                LIMIT 1
+            """
+            row = self._run_sql(sql)[0]
+            return (
+                f"Driver {row[0]} has the highest fuel cost at "
+                f"{self._to_float(row[1]):.2f}."
+            )
+
+        if "lowest fuel cost" in q or "least fuel cost" in q:
+            sql = f"""
+                SELECT driver_id, total_fuel_cost
+                FROM {self.table_name}
+                ORDER BY total_fuel_cost ASC
+                LIMIT 1
+            """
+            row = self._run_sql(sql)[0]
+            return (
+                f"Driver {row[0]} has the lowest fuel cost at "
+                f"{self._to_float(row[1]):.2f}."
+            )
+
+        if "highest distance driven" in q or "most distance driven" in q:
+            sql = f"""
+                SELECT driver_id, total_distance_driven
+                FROM {self.table_name}
+                ORDER BY total_distance_driven DESC
+                LIMIT 1
+            """
+            row = self._run_sql(sql)[0]
+            return (
+                f"Driver {row[0]} has the highest distance driven at "
+                f"{self._to_float(row[1]):.2f}."
+            )
+
+        if "lowest distance driven" in q or "least distance driven" in q:
+            sql = f"""
+                SELECT driver_id, total_distance_driven
+                FROM {self.table_name}
+                ORDER BY total_distance_driven ASC
+                LIMIT 1
+            """
+            row = self._run_sql(sql)[0]
+            return (
+                f"Driver {row[0]} has the lowest distance driven at "
+                f"{self._to_float(row[1]):.2f}."
+            )
 
         if "average mpg" in q:
             sql = f"""
@@ -93,7 +150,26 @@ class DriverAnalyticsService:
                 FROM {self.table_name}
             """
             val = self._run_sql(sql)[0][0]
-            return f"The average MPG across all drivers is {val:.2f}."
+            return f"The average MPG across all drivers is {self._to_float(val):.2f}."
+
+        if "average fuel cost" in q:
+            sql = f"""
+                SELECT AVG(total_fuel_cost)
+                FROM {self.table_name}
+            """
+            val = self._run_sql(sql)[0][0]
+            return f"The average fuel cost across all drivers is {self._to_float(val):.2f}."
+
+        if "average distance" in q:
+            sql = f"""
+                SELECT AVG(total_distance_driven)
+                FROM {self.table_name}
+            """
+            val = self._run_sql(sql)[0][0]
+            return (
+                f"The average distance driven across all drivers is "
+                f"{self._to_float(val):.2f}."
+            )
 
         match = re.search(r"(?:driver|driver id)\s+(\S+)", q)
         if match:
@@ -102,16 +178,15 @@ class DriverAnalyticsService:
             sql = f"""
                 SELECT driver_id, total_fuel_cost, total_distance_driven, avg_mpg
                 FROM {self.table_name}
-                WHERE driver_id = '{driver_id}'
+                WHERE CAST(driver_id AS STRING) = '{driver_id}'
                 LIMIT 1
             """
             row = self._run_sql(sql)[0]
-
             return (
                 f"Driver {row[0]} stats: "
-                f"fuel cost: {row[1]:.2f}, "
-                f"distance: {row[2]:.2f}, "
-                f"MPG: {row[3]:.2f}."
+                f"fuel cost: {self._to_float(row[1]):.2f}, "
+                f"distance: {self._to_float(row[2]):.2f}, "
+                f"MPG: {self._to_float(row[3]):.2f}."
             )
 
         return None
@@ -132,7 +207,7 @@ class DriverAnalyticsService:
 You are a Fleet Analytics assistant.
 
 Answer using only the provided data.
-If unknown, say you do not know.
+If the answer cannot be determined from the data, say you do not know.
 
 Data:
 {context}
@@ -144,8 +219,8 @@ Question:
         return self.llm_client.ask(prompt)
 
     def answer_question(self, user_query: str) -> str:
-        direct = self._direct_analytics_answer(user_query)
-        if direct:
-            return direct
+        direct_answer = self._direct_analytics_answer(user_query)
+        if direct_answer:
+            return direct_answer
 
         return self._llm_analytics_answer(user_query)
